@@ -2,42 +2,58 @@ import express from "express";
 import pkg from "pg";
 import dotenv from "dotenv";
 
-const app = express(); // Cria uma instância do Express.
-const port = 3000; // Define a porta em que o servidor irá "escutar" por requisições.
-dotenv.config(); // Executa a função de configuração do 'dotenv' carregando o .env
-const { Pool } = pkg;// Extrai a classe 'Pool' do pacote 'pg' que foi importado.
+dotenv.config();
 
+const { Pool } = pkg;
+const app = express();
+const port = 3000;
+
+let pool = null;
+
+function conectarBD() {
+  if (!pool) {
+    pool = new Pool({
+      connectionString: process.env.URL_BD,
+    });
+  }
+  return pool;
+}
+
+const db = conectarBD();
+
+let dbStatus = "ok";
+try {
+  await db.query("SELECT 1");
+  console.log("Conexão com o banco de dados estabelecida com sucesso!");
+} catch (e) {
+  dbStatus = e.message;
+  console.error("Erro na conexão com o banco de dados:", dbStatus);
+}
 
 app.get("/", async (req, res) => {
-
-  console.log("Rota GET / solicitada"); // Log no terminal
-
-  // Cria uma nova instância do Pool de conexões com o banco de dados.
-  const db = new Pool({
-    connectionString: process.env.URL_BD,
-  });
-
-  let dbStatus = "ok";
-
-  // Testa a conexão com o banco
-  try {
-    await db.query("SELECT 1");
-  } catch (e) {
-    dbStatus = e.message;
-  }
-
-  // Envia uma resposta de volta para o cliente.
+  console.log("Rota GET / solicitada");
   res.json({
-    descricao: "API para questões da prova",    // Substitua pelo conteúdo da sua API
-    autor: "Hugo Barros Correia",     // Substitua pelo seu nome
-    statusBD: dbStatus              // Informa se a conexão com o banco de dados foi bem-sucedida ou mostra o erro.
+    message: "API para atividade",
+    author: "Hugo Barros Correia",
+    statusBD: dbStatus,
   });
 });
 
-// ######
-// Local onde o servidor escuta as requisições que chegam
-// ######
+app.get("/questoes", async (req, res) => {
+  console.log("Rota GET /questoes solicitada");
+  try {
+    const resultado = await db.query("SELECT * FROM questoes");
+    const dados = resultado.rows;
+    res.json(dados);
+  } catch (e) {
+    console.error("Erro ao buscar questões:", e);
+    res.status(500).json({
+      erro: "Erro interno do servidor",
+      mensagem: "Não foi possível buscar as questões",
+    });
+  }
+});
 
 app.listen(port, () => {
-  console.log(`Serviço rodando na porta:  ${port}`);
+  console.log(`Serviço rodando na porta: ${port}`);
 });
